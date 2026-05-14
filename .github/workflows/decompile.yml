@@ -1,0 +1,58 @@
+name: Decompile PZ
+
+on:
+  workflow_dispatch:
+
+jobs:
+  decompile:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install Java 25 JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'oracle'
+          java-version: '25'
+
+      - name: Install SteamCMD
+        run: |
+          mkdir -p ~/steamcmd
+          cd ~/steamcmd
+          curl -fsSL https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz \
+            | tar -xz
+
+      - name: Install Project Zomboid via SteamCMD
+        run: |
+          mkdir -p ~/pzserver
+          ~/steamcmd/steamcmd.sh \
+            +force_install_dir ~/pzserver/ \
+            +login anonymous \
+            +app_update 380870 -beta unstable validate \
+            +quit
+
+      - name: Download ZomboidDecompiler
+        run: |
+          DOWNLOAD_URL=$(curl -fsSL \
+            https://api.github.com/repos/demiurgeQuantified/ZomboidDecompiler/releases/latest \
+            | grep '"browser_download_url"' \
+            | grep -v '\.sha' \
+            | head -1 \
+            | awk -F'"' '{print $4}')
+          echo "Downloading: $DOWNLOAD_URL"
+          curl -fsSL "$DOWNLOAD_URL" -o ~/ZomboidDecompiler.zip
+          unzip ~/ZomboidDecompiler.zip -d ~/
+          chmod +x ~/ZomboidDecompiler/bin/ZomboidDecompiler
+
+      - name: Decompile projectzomboid.jar
+        run: |
+          mkdir -p ~/workdir
+          cd ~/workdir
+          ~/ZomboidDecompiler/bin/ZomboidDecompiler ~/pzserver/java
+          echo "Decompilation complete."
+          echo "File count: $(find ~/workdir/output -name '*.java' | wc -l)"
+
+      - name: Upload decompiled source
+        uses: actions/upload-artifact@v4
+        with:
+          name: decompiled-source
+          path: ~/workdir/output/source/
