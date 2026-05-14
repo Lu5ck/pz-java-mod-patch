@@ -1,0 +1,262 @@
+name: Build PZ Mod
+
+on:
+  workflow_dispatch:        # Manual trigger
+  schedule:
+    - cron: '0 6 * * *'    # Daily at 06:00 UTC — adjust as needed
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # Needed to create GitHub Releases
+
+    steps:
+      # ---------------------------------------------------------------
+      # 1. Checkout the mod repo (contains your .patch files)
+      # ---------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      # ---------------------------------------------------------------
+      # 2. Install Java 25 JDK
+      # ---------------------------------------------------------------
+      - name: Install Java 25 JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'oracle'
+          java-version: '25'
+
+      # ---------------------------------------------------------------
+      # 3. Download & extract SteamCMD
+      # ---------------------------------------------------------------
+      - name: Install SteamCMD
+        run: |
+          mkdir -p ~/steamcmd
+          cd ~/steamcmd
+          curl -fsSL https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz \
+            | tar -xz
+
+      # ---------------------------------------------------------------
+      # 4. Fetch PZ build ID cheaply via app_info_print (no download)
+      #    and compare with cached version in repo
+      # ---------------------------------------------------------------
+      - name: Read PZ build ID
+        id: pz_version
+        run: |
+          BUILD_ID=$(~/steamcmd/steamcmd.sh \
+            +login anonymous \
+            +app_info_update 1 \
+            +app_info_print 380870 \
+            +quit 2>/dev/null \
+            | grep -A 20 '"branches"' \
+            | grep '"unstable"' -A 5 \
+            | grep '"buildid"' \
+            | awk -F'"' '{print $4}' \
+            | head -1)
+          echo "PZ build ID: $BUILD_ID"
+          echo "build_id=$BUILD_ID" >> "$GITHUB_OUTPUT"
+
+          CACHED_VERSION_FILE="${GITHUB_WORKSPACE}/pzVersion"
+          if [ -f "$CACHED_VERSION_FILE" ]; then
+            CACHED_ID=$(cat "$CACHED_VERSION_FILE")
+            echo "Cached build ID: $CACHED_ID"
+            if [ "$CACHED_ID" = "$BUILD_ID" ]; then
+              echo "Build ID unchanged — nothing to do."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "Build ID changed ($CACHED_ID → $BUILD_ID) — proceeding."
+              echo "skip=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "No pzVersion file found — proceeding with fresh build."
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ---------------------------------------------------------------
+      # 5. Full PZ server download — only if build ID changed
+      #    This places projectzomboid.jar at ~/pzserver/java/projectzomboid.jar
+      # ---------------------------------------------------------------
+      - name: Install Project Zomboid via SteamCMD
+        if: steps.pz_version.outputs.skip != 'true'
+        run: |
+          mkdir -p ~/pzserver
+          ~/steamcmd/steamcmd.sh \
+            +force_install_dir ~/pzserver/ \
+            +login anonymous \
+            +app_update 380870 -beta unstable validate \
+            +quit
+
+      # ---------------------------------------------------------------
+      # 6. Download the latest ZomboidDecompiler release
+      # ---------------------------------------------------------------
+      - name: Download ZomboidDecompiler
+        if: steps.pz_version.outputs.skip != 'true'
+        run: |
+          DOWNLOAD_URL=$(curl -fsSL \
+            https://api.github.com/repos/demiurgeQuantified/ZomboidDecompiler/releases/latest \
+            | grep '"browser_download_url"' \
+            | grep -v '\.sha' \
+            | head -1 \
+            | awk -F'"' '{print $4}')
+          echo "Downloading: $DOWNLOAD_URL"
+          curl -fsSL "$DOWNLOAD_URL" -o ~/ZomboidDecompiler.zip
+          unzip ~/ZomboidDecompiler.zip -d ~/
+          chmod +x ~/ZomboidDecompiler/bin/ZomboidDecompiler
+
+      # ---------------------------------------------------------------
+      # 7. Decompile projectzomboid.jar
+      #    ZomboidDecompiler outputs to ./output/source/zombie/
+      #    relative to CWD, so we run it from ~/workdir
+      # ---------------------------------------------------------------
+      - name: Decompile projectzomboid.jar
+        if: steps.pz_version.outputs.skip != 'true'
+        run: |
+          mkdir -p ~/workdir
+          cd ~/workdir
+          ~/ZomboidDecompiler/bin/ZomboidDecompiler ~/pzserver/java
+          echo "Decompilation complete."
+
+      # ---------------------------------------------------------------
+      # 8. Apply all patches in order, tracking the last patch that
+      #    touched each file so the final compile list preserves that
+      #    order (files touched by later patches compile last).
+      # ---------------------------------------------------------------
+      - name: Apply patches
+        if: steps.pz_version.outputs.skip != 'true'
+        run: |
+          set -e
+          PATCH_DIR="${GITHUB_WORKSPACE}/patches"
+          WORK_DIR="$HOME/workdir/output"
+          # Ordered list — later entries overwrite earlier ones for the
+          # same file, so each file appears only once at its latest position
+          ORDER_FILE="$HOME/patch_order.txt"
+          > "$ORDER_FILE"
+
+          if [ ! -d "$PATCH_DIR" ] || [ -z "$(ls -A "$PATCH_DIR"/*.patch 2>/dev/null)" ]; then
+            echo "No .patch files found in patches/. Nothing to apply."
+            exit 0
+          fi
+
+          for patch_file in "$PATCH_DIR"/*.patch; do
+            echo "--- Applying: $(basename "$patch_file") ---"
+            patch --dry-run -p1 -d "$WORK_DIR" < "$patch_file"
+            patch -p1 -d "$WORK_DIR" < "$patch_file"
+
+            # Extract touched files from this patch
+            grep '^+++ ' "$patch_file" \
+              | awk '{print $2}' \
+              | sed 's|^b/||' \
+              | while IFS= read -r rel_path; do
+                  # Remove any prior occurrence then append — preserves latest-patch order
+                  sed -i "\|^${rel_path}$|d" "$ORDER_FILE"
+                  echo "$rel_path" >> "$ORDER_FILE"
+                done
+          done
+
+          echo "Compile order:"
+          cat "$ORDER_FILE"
+
+      # ---------------------------------------------------------------
+      # 9. Compile all changed files in patch order
+      # ---------------------------------------------------------------
+      - name: Compile changed files
+        if: steps.pz_version.outputs.skip != 'true'
+        run: |
+          echo "Using javac: $(which javac) — $(javac -version)"
+          ORDER_FILE="$HOME/patch_order.txt"
+          WORK_DIR="$HOME/workdir/output"
+          COMPILED_DIR="$HOME/compiled"
+          mkdir -p "$COMPILED_DIR"
+
+          if [ ! -s "$ORDER_FILE" ]; then
+            echo "No changed files to compile."
+            exit 0
+          fi
+
+          JAVA_FILES=()
+          while IFS= read -r rel_path; do
+            full_path="$WORK_DIR/$rel_path"
+            if [ -f "$full_path" ]; then
+              JAVA_FILES+=("$full_path")
+            else
+              echo "WARNING: expected source file not found: $full_path"
+            fi
+          done < "$ORDER_FILE"
+
+          echo "Compiling ${#JAVA_FILES[@]} file(s)..."
+          javac \
+            -cp "$COMPILED_DIR:$HOME/pzserver/java/projectzomboid.jar" \
+            -d "$COMPILED_DIR" \
+            "${JAVA_FILES[@]}"
+
+          echo "Compilation successful."
+
+      # ---------------------------------------------------------------
+      # 10. Merge compiled .class files back into the .jar
+      # ---------------------------------------------------------------
+      - name: Merge compiled classes into JAR
+        if: steps.pz_version.outputs.skip != 'true'
+        run: |
+          COMPILED_DIR="$HOME/compiled"
+          ORIGINAL_JAR="$HOME/pzserver/java/projectzomboid.jar"
+          OUTPUT_JAR="$HOME/projectzomboid-modded.jar"
+
+          if [ -z "$(ls -A "$COMPILED_DIR" 2>/dev/null)" ]; then
+            echo "No compiled classes — copying original JAR as output."
+            cp "$ORIGINAL_JAR" "$OUTPUT_JAR"
+          else
+            cp "$ORIGINAL_JAR" "$OUTPUT_JAR"
+            jar uf "$OUTPUT_JAR" -C "$COMPILED_DIR" .
+            echo "Merge complete: $OUTPUT_JAR"
+          fi
+
+      # ---------------------------------------------------------------
+      # 11a. Build release notes patch list
+      # ---------------------------------------------------------------
+      - name: Build patch list
+        if: steps.pz_version.outputs.skip != 'true'
+        id: patch_list
+        run: |
+          PATCH_DIR="${GITHUB_WORKSPACE}/patches"
+          if ls "$PATCH_DIR"/*.patch 2>/dev/null | grep -q .; then
+            LIST=$(ls "$PATCH_DIR"/*.patch | sed 's|.*/||' | sed 's/^/- /' | tr '\n' '\n')
+          else
+            LIST="_(none)_"
+          fi
+          echo "list<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$LIST" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      # ---------------------------------------------------------------
+      # 11b. Create a GitHub Release and upload the modded JAR
+      # ---------------------------------------------------------------
+      - name: Create GitHub Release
+        if: steps.pz_version.outputs.skip != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "pz-build-${{ steps.pz_version.outputs.build_id }}"
+          name: "PZ Build ${{ steps.pz_version.outputs.build_id }}"
+          body: |
+            Automated modded build for Project Zomboid (unstable) build **${{ steps.pz_version.outputs.build_id }}**.
+
+            ### Applied patches
+            ${{ steps.patch_list.outputs.list }}
+
+            Built by GitHub Actions on `${{ github.run_id }}`.
+          files: ~/projectzomboid-modded.jar
+          fail_on_unmatched_files: true
+
+      # ---------------------------------------------------------------
+      # 12. Write new build ID to pzVersion and commit it to the repo
+      # ---------------------------------------------------------------
+      - name: Update pzVersion in repo
+        if: steps.pz_version.outputs.skip != 'true'
+        run: |
+          echo "${{ steps.pz_version.outputs.build_id }}" > "${GITHUB_WORKSPACE}/pzVersion"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pzVersion
+          git commit -m "chore: update pzVersion to ${{ steps.pz_version.outputs.build_id }} [skip ci]"
+          git push
+        working-directory: ${{ github.workspace }}
