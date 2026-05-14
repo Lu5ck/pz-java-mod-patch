@@ -1,0 +1,12 @@
+diff --git a/source/zombie/network/GameServer.java b/source/zombie/network/GameServer.java
+index fc78799..0a9b95b 100644
+--- a/source/zombie/network/GameServer.java
++++ b/source/zombie/network/GameServer.java
+@@ -1145,6 +1145,7 @@ public class GameServer {
+                             LoginQueue.update();
+                             ZipBackup.onPeriod();
+                             SteamUtils.runLoop();
++                            LuaManager.cancelModUpdateCheckIfTimedOut();
+                             TradingManager.getInstance().update();
+                             WarManager.update();
+                             NetworkPlayerManager.getInstance().update();

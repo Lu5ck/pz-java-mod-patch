@@ -1,0 +1,142 @@
+diff --git a/source/zombie/Lua/LuaManager.java b/source/zombie/Lua/LuaManager.java
+index 96af6ef..1430ed0 100644
+--- a/source/zombie/Lua/LuaManager.java
++++ b/source/zombie/Lua/LuaManager.java
+@@ -1362,7 +1362,7 @@ public final class LuaManager {
+ 
+             bufferedReader.close();
+         } catch (Exception ex) {
+-            Logger.getLogger(LuaManager.class.getName()).log(Level.SEVERE, "Error found in LUA file: " + filename, null);
++            Logger.getLogger(LuaManager.class.getName()).log(Level.SEVERE, "Error found in LUA file: " + filename, (Throwable)null);
+             ExceptionLogger.logException(ex);
+             thread.debugException(ex);
+             return null;
+@@ -1379,12 +1379,12 @@ public final class LuaManager {
+         ZombiesZoneDefinition.dirty = true;
+         LuaReturn ret = caller.protectedCall(thread, closure);
+         if (!ret.isSuccess()) {
+-            Logger.getLogger(IsoWorld.class.getName()).log(Level.SEVERE, ret.getErrorString(), null);
++            Logger.getLogger(IsoWorld.class.getName()).log(Level.SEVERE, ret.getErrorString(), (Throwable)null);
+             if (ret.getJavaException() != null) {
+-                Logger.getLogger(IsoWorld.class.getName()).log(Level.SEVERE, ret.getJavaException().toString(), null);
++                Logger.getLogger(IsoWorld.class.getName()).log(Level.SEVERE, ret.getJavaException().toString(), (Throwable)null);
+             }
+ 
+-            Logger.getLogger(IsoWorld.class.getName()).log(Level.SEVERE, ret.getLuaStackTrace(), null);
++            Logger.getLogger(IsoWorld.class.getName()).log(Level.SEVERE, ret.getLuaStackTrace(), (Throwable)null);
+         }
+ 
+         loaded.add(orig);
+@@ -1664,6 +1664,10 @@ public final class LuaManager {
+         return PZArrayUtil.filtered(elements, Objects::nonNull);
+     }
+ 
++    public static void cancelModUpdateCheckIfTimedOut() {
++        GlobalObject.ItemQueryJava.cancelIfTimedOut();
++    }
++
+     public static final class Exposer extends LuaJavaClassExposer {
+         private final HashSet<Class<?>> exposed = new LinkedHashSet();
+ 
+@@ -10676,12 +10680,24 @@ public final class LuaManager {
+             }
+         }
+ 
+-        private static final class ItemQueryJava implements ISteamWorkshopCallback {
++        static final class ItemQueryJava implements ISteamWorkshopCallback {
++            private static volatile ItemQueryJava current = null;
++            private static final long TIMEOUT_MS = 60_000L;
++
+             private final long handle;
+             private final UdpConnection connection;
++            private final long startTimeMs;
+ 
+             public ItemQueryJava(ArrayList<String> itemIDs, UdpConnection connection) {
++                // Cancel any previous stuck query before registering a new one.
++                ItemQueryJava previous = current;
++                if (previous != null) {
++                    DebugType.Mod.println("CheckModsNeedUpdate: Cancelling previous stuck query");
++                    previous.cancel();
++                }
++
+                 this.connection = connection;
++                this.startTimeMs = System.currentTimeMillis();
+                 long[] itemIDsArray = new long[itemIDs.size()];
+                 int count = 0;
+ 
+@@ -10696,9 +10712,32 @@ public final class LuaManager {
+                 if (this.handle == 0L) {
+                     SteamWorkshop.instance.RemoveCallback(this);
+                     this.inform("CheckModsNeedUpdate: Check not completed");
++                } else {
++                    current = this;
++                }
++            }
++
++            // Called from the main server loop to expire queries Steam never responds to.
++            public static void cancelIfTimedOut() {
++                ItemQueryJava query = current;
++                if (query != null && (System.currentTimeMillis() - query.startTimeMs) > TIMEOUT_MS) {
++                    DebugType.Mod.println("CheckModsNeedUpdate: Query timed out after 60s, cancelling");
++                    query.inform("CheckModsNeedUpdate: Timed out");
++                    query.complete();
+                 }
+             }
+ 
++            private void complete() {
++                if (current == this) current = null;
++                SteamWorkshop.instance.RemoveCallback(this);
++                SteamWorkshop.instance.ReleaseQueryUGCRequest(this.handle);
++            }
++
++            // Silently discard without sending a chat message (used when superseded by a new query).
++            private void cancel() {
++                complete();
++            }
++
+             private void inform(String message) {
+                 if (this.connection != null) {
+                     ChatServer.getInstance().sendMessageToServerChat(this.connection, message);
+@@ -10742,8 +10781,6 @@ public final class LuaManager {
+             @Override
+             public void onItemQueryCompleted(long handle, int numResults) {
+                 if (handle == this.handle) {
+-                    SteamWorkshop.instance.RemoveCallback(this);
+-
+                     for (int i = 0; i < numResults; i++) {
+                         SteamUGCDetails details = SteamWorkshop.instance.GetQueryUGCResult(handle, i);
+                         if (details != null) {
+@@ -10758,23 +10795,22 @@ public final class LuaManager {
+ 
+                             if (SteamWorkshopItem.ItemState.NeedsUpdate.and(itemState)) {
+                                 this.inform("CheckModsNeedUpdate: Mods need update");
+-                                SteamWorkshop.instance.ReleaseQueryUGCRequest(handle);
++                                this.complete();
+                                 return;
+                             }
+                         }
+                     }
+ 
+                     this.inform("CheckModsNeedUpdate: Mods updated");
+-                    SteamWorkshop.instance.ReleaseQueryUGCRequest(handle);
++                    this.complete();
+                 }
+             }
+ 
+             @Override
+             public void onItemQueryNotCompleted(long handle, int result) {
+                 if (handle == this.handle) {
+-                    SteamWorkshop.instance.RemoveCallback(this);
+-                    SteamWorkshop.instance.ReleaseQueryUGCRequest(handle);
+                     this.inform("CheckModsNeedUpdate: Check not completed");
++                    this.complete();
+                 }
+             }
+         }
+@@ -10814,4 +10850,4 @@ public final class LuaManager {
+             }
+         }
+     }
+-}
++}
+\ No newline at end of file

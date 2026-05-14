@@ -1,0 +1,45 @@
+diff --git a/source/zombie/Lua/LuaEventManager.java b/source/zombie/Lua/LuaEventManager.java
+index fffa0af..101359e 100644
+--- a/source/zombie/Lua/LuaEventManager.java
++++ b/source/zombie/Lua/LuaEventManager.java
+@@ -828,6 +828,8 @@ public final class LuaEventManager implements JavaFunction {
+         AddEvent("OnSteamServerFailedToRespond2");
+         AddEvent("OnSteamRulesRefreshComplete");
+         AddEvent("OnSteamRefreshInternetServers");
++        AddEvent("onPlayerFullyConnected");
++        AddEvent("onPlayerDisconnected");
+     }
+ 
+     public static void clear() {
+diff --git a/source/zombie/core/raknet/UdpConnection.java b/source/zombie/core/raknet/UdpConnection.java
+index cbe8586..498bfd9 100644
+--- a/source/zombie/core/raknet/UdpConnection.java
++++ b/source/zombie/core/raknet/UdpConnection.java
+@@ -32,6 +32,7 @@ import zombie.network.anticheats.PacketValidator;
+ import zombie.network.server.EventManager;
+ import zombie.network.statistics.data.NetworkStatistic;
+ import zombie.util.StringUtils;
++import zombie.Lua.LuaEventManager;
+ 
+ public class UdpConnection extends PacketsCache implements IConnection {
+     private static final long PLAYER_SAVE_INTERVAL = 180000L;
+@@ -382,6 +383,7 @@ public class UdpConnection extends PacketsCache implements IConnection {
+         this.fullyConnected = true;
+         this.playerSave.Reset();
+         this.setConnectionTimestamp(5000L);
++        LuaEventManager.triggerEvent("onPlayerFullyConnected", this.userName, this.steamId);
+         ConnectionManager.log("fully-connected", "", this);
+         EventManager.instance().report("[" + this.userName + "] connected to server");
+     }
+diff --git a/source/zombie/network/GameServer.java b/source/zombie/network/GameServer.java
+index fc78799..8fe8bbb 100644
+--- a/source/zombie/network/GameServer.java
++++ b/source/zombie/network/GameServer.java
+@@ -2767,6 +2767,7 @@ public class GameServer {
+             INetworkPacket.sendToAll(PacketTypes.PacketType.PlayerTimeout, player);
+             ServerLOS.instance.removePlayer(player);
+             ZombiePopulationManager.instance.updateLoadedAreas();
++            LuaEventManager.triggerEvent("onPlayerDisconnected", player.getUsername(), player.getSteamID());
+             DebugType.DetailedInfo.trace("Disconnected player \"" + player.getDisplayName() + "\" " + connection.getConnectedGUID());
+             LoggerManager.getLogger("user")
+                 .write(connection.getIDStr() + " \"" + player.getUsername() + "\" disconnected player " + LoggerManager.getPlayerCoords(player));
