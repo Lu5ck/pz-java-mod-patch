@@ -1,5 +1,5 @@
 diff --git a/source/zombie/Lua/LuaManager.java b/source/zombie/Lua/LuaManager.java
-index 96af6ef..1430ed0 100644
+index 96af6ef..fda9654 100644
 --- a/source/zombie/Lua/LuaManager.java
 +++ b/source/zombie/Lua/LuaManager.java
 @@ -1362,7 +1362,7 @@ public final class LuaManager {
@@ -38,7 +38,15 @@ index 96af6ef..1430ed0 100644
      public static final class Exposer extends LuaJavaClassExposer {
          private final HashSet<Class<?>> exposed = new LinkedHashSet();
  
-@@ -10676,12 +10680,24 @@ public final class LuaManager {
+@@ -7099,6 +7103,7 @@ public final class LuaManager {
+                     FileInputStream inStream = new FileInputStream(inFile);
+ 
+                     int var8;
++                    int var14;
+                     label64: {
+                         try {
+                             DataInputStream input = new DataInputStream(inStream);
+@@ -10676,12 +10681,24 @@ public final class LuaManager {
              }
          }
  
@@ -64,25 +72,42 @@ index 96af6ef..1430ed0 100644
                  long[] itemIDsArray = new long[itemIDs.size()];
                  int count = 0;
  
-@@ -10696,9 +10712,32 @@ public final class LuaManager {
+@@ -10692,13 +10709,49 @@ public final class LuaManager {
+                     }
+                 }
+ 
++                // Trim to the number of valid IDs. Passing trailing zeros to Steam
++                // causes it to query phantom item ID 0 entries whose callbacks may
++                // never fire, which is one way the command gets stuck in the first place.
++                if (count < itemIDsArray.length) {
++                    itemIDsArray = java.util.Arrays.copyOf(itemIDsArray, count);
++                }
++
++                // Nothing valid to query - report immediately and bail out.
++                if (count == 0) {
++                    this.handle = 0L;
++                    this.inform("CheckModsNeedUpdate: No valid workshop IDs found");
++                    return;
++                }
++
+                 this.handle = SteamWorkshop.instance.CreateQueryUGCDetailsRequest(itemIDsArray, this);
                  if (this.handle == 0L) {
                      SteamWorkshop.instance.RemoveCallback(this);
                      this.inform("CheckModsNeedUpdate: Check not completed");
 +                } else {
 +                    current = this;
-+                }
-+            }
-+
+                 }
+             }
+ 
 +            // Called from the main server loop to expire queries Steam never responds to.
 +            public static void cancelIfTimedOut() {
 +                ItemQueryJava query = current;
 +                if (query != null && (System.currentTimeMillis() - query.startTimeMs) > TIMEOUT_MS) {
-+                    DebugType.Mod.println("CheckModsNeedUpdate: Query timed out after 60s, cancelling");
-+                    query.inform("CheckModsNeedUpdate: Timed out");
++                    query.inform("Timed Out");
 +                    query.complete();
-                 }
-             }
- 
++                }
++            }
++
 +            private void complete() {
 +                if (current == this) current = null;
 +                SteamWorkshop.instance.RemoveCallback(this);
@@ -97,7 +122,7 @@ index 96af6ef..1430ed0 100644
              private void inform(String message) {
                  if (this.connection != null) {
                      ChatServer.getInstance().sendMessageToServerChat(this.connection, message);
-@@ -10742,8 +10781,6 @@ public final class LuaManager {
+@@ -10742,8 +10795,6 @@ public final class LuaManager {
              @Override
              public void onItemQueryCompleted(long handle, int numResults) {
                  if (handle == this.handle) {
@@ -106,7 +131,7 @@ index 96af6ef..1430ed0 100644
                      for (int i = 0; i < numResults; i++) {
                          SteamUGCDetails details = SteamWorkshop.instance.GetQueryUGCResult(handle, i);
                          if (details != null) {
-@@ -10758,23 +10795,22 @@ public final class LuaManager {
+@@ -10758,23 +10809,22 @@ public final class LuaManager {
  
                              if (SteamWorkshopItem.ItemState.NeedsUpdate.and(itemState)) {
                                  this.inform("CheckModsNeedUpdate: Mods need update");
@@ -133,7 +158,7 @@ index 96af6ef..1430ed0 100644
                  }
              }
          }
-@@ -10814,4 +10850,4 @@ public final class LuaManager {
+@@ -10814,4 +10864,4 @@ public final class LuaManager {
              }
          }
      }
