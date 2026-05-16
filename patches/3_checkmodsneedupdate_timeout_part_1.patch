@@ -1,8 +1,16 @@
 diff --git a/source/zombie/Lua/LuaManager.java b/source/zombie/Lua/LuaManager.java
-index 96af6ef..fda9654 100644
+index 96af6ef..ffdfa4a 100644
 --- a/source/zombie/Lua/LuaManager.java
 +++ b/source/zombie/Lua/LuaManager.java
-@@ -1362,7 +1362,7 @@ public final class LuaManager {
+@@ -57,6 +57,7 @@ import java.sql.SQLException;
+ import java.text.SimpleDateFormat;
+ import java.util.ArrayList;
+ import java.util.Arrays;
++import java.util.concurrent.atomic.AtomicReference;
+ import java.util.Calendar;
+ import java.util.Collections;
+ import java.util.Comparator;
+@@ -1362,7 +1363,7 @@ public final class LuaManager {
  
              bufferedReader.close();
          } catch (Exception ex) {
@@ -11,7 +19,7 @@ index 96af6ef..fda9654 100644
              ExceptionLogger.logException(ex);
              thread.debugException(ex);
              return null;
-@@ -1379,12 +1379,12 @@ public final class LuaManager {
+@@ -1379,12 +1380,12 @@ public final class LuaManager {
          ZombiesZoneDefinition.dirty = true;
          LuaReturn ret = caller.protectedCall(thread, closure);
          if (!ret.isSuccess()) {
@@ -27,7 +35,7 @@ index 96af6ef..fda9654 100644
          }
  
          loaded.add(orig);
-@@ -1664,6 +1664,10 @@ public final class LuaManager {
+@@ -1664,6 +1665,10 @@ public final class LuaManager {
          return PZArrayUtil.filtered(elements, Objects::nonNull);
      }
  
@@ -38,7 +46,7 @@ index 96af6ef..fda9654 100644
      public static final class Exposer extends LuaJavaClassExposer {
          private final HashSet<Class<?>> exposed = new LinkedHashSet();
  
-@@ -7099,6 +7103,7 @@ public final class LuaManager {
+@@ -7099,6 +7104,7 @@ public final class LuaManager {
                      FileInputStream inStream = new FileInputStream(inFile);
  
                      int var8;
@@ -46,13 +54,13 @@ index 96af6ef..fda9654 100644
                      label64: {
                          try {
                              DataInputStream input = new DataInputStream(inStream);
-@@ -10676,12 +10681,24 @@ public final class LuaManager {
+@@ -10676,12 +10682,24 @@ public final class LuaManager {
              }
          }
  
 -        private static final class ItemQueryJava implements ISteamWorkshopCallback {
 +        static final class ItemQueryJava implements ISteamWorkshopCallback {
-+            private static volatile ItemQueryJava current = null;
++            private static final AtomicReference<ItemQueryJava> current = new AtomicReference<>(null);
 +            private static final long TIMEOUT_MS = 60_000L;
 +
              private final long handle;
@@ -61,10 +69,10 @@ index 96af6ef..fda9654 100644
  
              public ItemQueryJava(ArrayList<String> itemIDs, UdpConnection connection) {
 +                // Cancel any previous stuck query before registering a new one.
-+                ItemQueryJava previous = current;
++                ItemQueryJava previous = current.getAndSet(null);
 +                if (previous != null) {
-+                    DebugType.Mod.println("CheckModsNeedUpdate: Cancelling previous stuck query");
-+                    previous.cancel();
++                    this.inform("CheckModsNeedUpdate: Cancelling previous query");
++                    previous.release();
 +                }
 +
                  this.connection = connection;
@@ -72,7 +80,7 @@ index 96af6ef..fda9654 100644
                  long[] itemIDsArray = new long[itemIDs.size()];
                  int count = 0;
  
-@@ -10692,13 +10709,49 @@ public final class LuaManager {
+@@ -10692,10 +10710,50 @@ public final class LuaManager {
                      }
                  }
  
@@ -95,48 +103,51 @@ index 96af6ef..fda9654 100644
                      SteamWorkshop.instance.RemoveCallback(this);
                      this.inform("CheckModsNeedUpdate: Check not completed");
 +                } else {
-+                    current = this;
-                 }
-             }
- 
-+            // Called from the main server loop to expire queries Steam never responds to.
-+            public static void cancelIfTimedOut() {
-+                ItemQueryJava query = current;
-+                if (query != null && (System.currentTimeMillis() - query.startTimeMs) > TIMEOUT_MS) {
-+                    query.inform("Timed Out");
-+                    query.complete();
++                    current.set(this);
 +                }
 +            }
 +
-+            private void complete() {
-+                if (current == this) current = null;
++            // Called from the main server loop to expire queries Steam never responds to.
++            public static void cancelIfTimedOut() {
++                ItemQueryJava query = current.get();
++                if (query != null && (System.currentTimeMillis() - query.startTimeMs) > TIMEOUT_MS) {
++                    if (current.compareAndSet(query, null)) {
++                        query.inform("Timed Out");
++                        query.release();
++                    }
++                }
++            }
++
++            // Atomically claims completion rights. Only the first caller returns true,
++            // preventing double-release races between the main loop and Steam callbacks.
++            private boolean tryComplete() {
++                return current.compareAndSet(this, null);
++            }
++
++            private void release() {
 +                SteamWorkshop.instance.RemoveCallback(this);
-+                SteamWorkshop.instance.ReleaseQueryUGCRequest(this.handle);
-+            }
-+
-+            // Silently discard without sending a chat message (used when superseded by a new query).
-+            private void cancel() {
-+                complete();
-+            }
-+
-             private void inform(String message) {
-                 if (this.connection != null) {
-                     ChatServer.getInstance().sendMessageToServerChat(this.connection, message);
-@@ -10742,8 +10795,6 @@ public final class LuaManager {
++                if (this.handle != 0L) {
++                    SteamWorkshop.instance.ReleaseQueryUGCRequest(this.handle);
+                 }
+             }
+ 
+@@ -10741,9 +10799,7 @@ public final class LuaManager {
+ 
              @Override
              public void onItemQueryCompleted(long handle, int numResults) {
-                 if (handle == this.handle) {
+-                if (handle == this.handle) {
 -                    SteamWorkshop.instance.RemoveCallback(this);
 -
++                if (handle == this.handle && tryComplete()) {
                      for (int i = 0; i < numResults; i++) {
                          SteamUGCDetails details = SteamWorkshop.instance.GetQueryUGCResult(handle, i);
                          if (details != null) {
-@@ -10758,23 +10809,22 @@ public final class LuaManager {
+@@ -10758,23 +10814,22 @@ public final class LuaManager {
  
                              if (SteamWorkshopItem.ItemState.NeedsUpdate.and(itemState)) {
                                  this.inform("CheckModsNeedUpdate: Mods need update");
 -                                SteamWorkshop.instance.ReleaseQueryUGCRequest(handle);
-+                                this.complete();
++                                this.release();
                                  return;
                              }
                          }
@@ -144,24 +155,18 @@ index 96af6ef..fda9654 100644
  
                      this.inform("CheckModsNeedUpdate: Mods updated");
 -                    SteamWorkshop.instance.ReleaseQueryUGCRequest(handle);
-+                    this.complete();
++                    this.release();
                  }
              }
  
              @Override
              public void onItemQueryNotCompleted(long handle, int result) {
-                 if (handle == this.handle) {
+-                if (handle == this.handle) {
 -                    SteamWorkshop.instance.RemoveCallback(this);
 -                    SteamWorkshop.instance.ReleaseQueryUGCRequest(handle);
++                if (handle == this.handle && tryComplete()) {
                      this.inform("CheckModsNeedUpdate: Check not completed");
-+                    this.complete();
++                    this.release();
                  }
              }
          }
-@@ -10814,4 +10864,4 @@ public final class LuaManager {
-             }
-         }
-     }
--}
-+}
-\ No newline at end of file
