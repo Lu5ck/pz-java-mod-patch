@@ -1,0 +1,50 @@
+diff --git a/source/zombie/worldMap/WorldMapVisitedServer.java b/source/zombie/worldMap/WorldMapVisitedServer.java
+index bbbed38..3fd0508 100644
+--- a/source/zombie/worldMap/WorldMapVisitedServer.java
++++ b/source/zombie/worldMap/WorldMapVisitedServer.java
+@@ -17,6 +17,7 @@ import java.nio.file.StandardOpenOption;
+ import java.util.Arrays;
+ import java.util.HashMap;
+ import java.util.Map;
++import zombie.SandboxOptions;
+ import zombie.UsedFromLua;
+ import zombie.ZomboidFileSystem;
+ import zombie.characters.IsoPlayer;
+@@ -116,6 +117,7 @@ public class WorldMapVisitedServer {
+                 }
+             }
+ 
++            boolean zipLoaded = false;
+             if (zipFile.exists()) {
+                 try {
+                     FileSystem zipFS = FileSystems.newFileSystem(zipPath);
+@@ -138,7 +140,7 @@ public class WorldMapVisitedServer {
+                                     System.arraycopy(in.array(), 0, entity, i, sizeRead);
+                                 }
+ 
+-                                PlayerVisitedPacket.HandleSendPacket(entity, connection);
++                                zipLoaded = true;
+                             } catch (Throwable var17) {
+                                 try {
+                                     bIS.close();
+@@ -185,6 +187,20 @@ public class WorldMapVisitedServer {
+                 }
+             }
+ 
++            // If MapAllKnown is set, OR every byte with 0xAA to set BIT_KNOWN
++            // (bit 1 of each 2-bit slot) across the whole map, while leaving
++            // BIT_VISITED (bit 0) exactly as loaded from disk.
++            boolean mapAllKnown = SandboxOptions.getInstance().map.mapAllKnown.getValue();
++            if (mapAllKnown) {
++                for (int i = 0; i < entity.length; i++) {
++                    entity[i] |= (byte) 0xAA;
++                }
++            }
++
++            if (zipLoaded || mapAllKnown) {
++                PlayerVisitedPacket.HandleSendPacket(entity, connection);
++            }
++
+             this.dictionary.put(connection.getUserName(), entity);
+         }
+     }
