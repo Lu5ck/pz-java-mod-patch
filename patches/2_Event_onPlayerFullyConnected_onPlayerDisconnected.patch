@@ -1,18 +1,18 @@
 diff --git a/source/zombie/Lua/LuaEventManager.java b/source/zombie/Lua/LuaEventManager.java
-index fffa0af..101359e 100644
+index 53194fb..5a18c96 100644
 --- a/source/zombie/Lua/LuaEventManager.java
 +++ b/source/zombie/Lua/LuaEventManager.java
-@@ -828,6 +828,8 @@ public final class LuaEventManager implements JavaFunction {
-         AddEvent("OnSteamServerFailedToRespond2");
-         AddEvent("OnSteamRulesRefreshComplete");
+@@ -835,6 +835,8 @@ public final class LuaEventManager implements JavaFunction {
          AddEvent("OnSteamRefreshInternetServers");
+         AddEvent("OptionControllerButtonStyleChanged");
+         AddEvent("OptionGamepadBindingPresetChanged");
 +        AddEvent("onPlayerFullyConnected");
 +        AddEvent("onPlayerDisconnected");
      }
  
      public static void clear() {
 diff --git a/source/zombie/core/raknet/UdpConnection.java b/source/zombie/core/raknet/UdpConnection.java
-index cbe8586..498bfd9 100644
+index 3a400eb..e369015 100644
 --- a/source/zombie/core/raknet/UdpConnection.java
 +++ b/source/zombie/core/raknet/UdpConnection.java
 @@ -32,6 +32,7 @@ import zombie.network.anticheats.PacketValidator;
@@ -23,7 +23,7 @@ index cbe8586..498bfd9 100644
  
  public class UdpConnection extends PacketsCache implements IConnection {
      private static final long PLAYER_SAVE_INTERVAL = 180000L;
-@@ -382,6 +383,7 @@ public class UdpConnection extends PacketsCache implements IConnection {
+@@ -384,6 +385,7 @@ public class UdpConnection extends PacketsCache implements IConnection {
          this.fullyConnected = true;
          this.playerSave.Reset();
          this.setConnectionTimestamp(5000L);
@@ -32,10 +32,10 @@ index cbe8586..498bfd9 100644
          EventManager.instance().report("[" + this.userName + "] connected to server");
      }
 diff --git a/source/zombie/network/GameServer.java b/source/zombie/network/GameServer.java
-index fc78799..8fe8bbb 100644
+index b5a7ad8..d4c4b14 100644
 --- a/source/zombie/network/GameServer.java
 +++ b/source/zombie/network/GameServer.java
-@@ -2767,6 +2767,7 @@ public class GameServer {
+@@ -2770,6 +2770,7 @@ public class GameServer {
              INetworkPacket.sendToAll(PacketTypes.PacketType.PlayerTimeout, player);
              ServerLOS.instance.removePlayer(player);
              ZombiePopulationManager.instance.updateLoadedAreas();
