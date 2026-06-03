@@ -1,0 +1,49 @@
+diff --git a/source/zombie/inventory/InventoryItem.java b/source/zombie/inventory/InventoryItem.java
+index 36395f8..f401b9d 100644
+--- a/source/zombie/inventory/InventoryItem.java
++++ b/source/zombie/inventory/InventoryItem.java
+@@ -1913,6 +1913,7 @@ public class InventoryItem extends GameEntity {
+                         "InventoryItem.loadItem() read more data than save() wrote (" + WorldDictionary.getItemTypeDebugString(registryID) + ")"
+                     );
+                 }
++                return null;
+             }
+ 
+             return item;
+diff --git a/source/zombie/network/GameServer.java b/source/zombie/network/GameServer.java
+index b5a7ad8..d1b3308 100644
+--- a/source/zombie/network/GameServer.java
++++ b/source/zombie/network/GameServer.java
+@@ -1601,7 +1601,23 @@ public class GameServer {
+     }
+ 
+     static void receiveInvMngGetItem(ByteBufferReader bb, UdpConnection connection, short packetType) throws IOException {
++        // Save position BEFORE reading caller, so we can replay the full packet if valid
++        int packetStart = bb.bb.position();
+         short caller = bb.getShort();
++
++        // Validate item before relaying - discard corrupt/mismatched items
++        InventoryItem item = null;
++        try {
++            item = InventoryItem.loadItem(bb.bb, 247);
++        } catch (Exception ex) {
++            DebugType.General.printException(ex, LogSeverity.Error);
++        }
++
++        if (item == null) {
++            DebugLog.log("receiveInvMngGetItem: dropping invalid item for caller " + caller);
++            return;  // Don't relay corrupt bytes to client
++        }
++
+         IsoPlayer player = (IsoPlayer)IDToPlayerMap.get(caller);
+         if (player != null) {
+             for (int n = 0; n < udpEngine.connections.size(); n++) {
+@@ -1609,7 +1625,7 @@ public class GameServer {
+                 if (c.getConnectedGUID() != connection.getConnectedGUID() && c.getConnectedGUID() == (Long)PlayerToAddressMap.get(player)) {
+                     ByteBufferWriter b = c.startPacket();
+                     PacketTypes.PacketType.InvMngGetItem.doPacket(b);
+-                    bb.rewind();
++                    bb.bb.position(packetStart);  // rewind to saved position, not bb.rewind()
+                     b.put(bb);
+                     PacketTypes.PacketType.InvMngGetItem.send(c);
+                     break;
