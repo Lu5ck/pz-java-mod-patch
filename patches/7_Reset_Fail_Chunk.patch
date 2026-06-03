@@ -1,0 +1,21 @@
+diff --git a/source/zombie/iso/IsoChunk.java b/source/zombie/iso/IsoChunk.java
+index 44c0db8..80a2c7d 100644
+--- a/source/zombie/iso/IsoChunk.java
++++ b/source/zombie/iso/IsoChunk.java
+@@ -980,6 +980,7 @@ public final class IsoChunk {
+                         case 2 -> (int)Math.ceil(chance / 10.0F);
+                         case 3 -> (int)Math.ceil(chance / 1.5F);
+                         case 5 -> 2;
++                        default -> chance;
+                     };
+                     if (SystemDisabler.doVehiclesEverywhere || DebugOptions.instance.vehicleSpawnEverywhere.getValue() || type.forceSpawn) {
+                         chance = 100;
+@@ -2309,7 +2310,7 @@ public final class IsoChunk {
+                     }
+ 
+                     this.BackupBlam(wx, wy, e);
+-                    loaded = false;
++                    loaded = this.LoadBrandNew(wx, wy);
+                 }
+             } else {
+                 loaded = this.LoadBrandNew(wx, wy);
