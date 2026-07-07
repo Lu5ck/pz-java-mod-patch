@@ -1,0 +1,31 @@
+diff --git a/source/zombie/SandboxOptions.java b/source/zombie/SandboxOptions.java
+index 26a835e..5808dce 100644
+--- a/source/zombie/SandboxOptions.java
++++ b/source/zombie/SandboxOptions.java
+@@ -929,7 +929,7 @@ public final class SandboxOptions {
+ 
+                 fw.write("    VERSION = 6," + lineSep);
+ 
+-                for (SandboxOptions.SandboxOption option : (ArrayList)tables.get("")) {
++                for (SandboxOptions.SandboxOption option : tables.get("")) {
+                     if (!isDeveloperFile) {
+                         String tooltip = option.asConfigOption().getTooltip();
+                         if (tooltip != null) {
+@@ -958,7 +958,7 @@ public final class SandboxOptions {
+                 for (String tableName : tableNames) {
+                     fw.write("    " + tableName + " = {" + lineSep);
+ 
+-                    for (SandboxOptions.SandboxOption option : (ArrayList)tables.get(tableName)) {
++                    for (SandboxOptions.SandboxOption option : tables.get(tableName)) {
+                         if (!isDeveloperFile) {
+                             String tooltip = option.asConfigOption().getTooltip();
+                             if (tooltip != null) {
+@@ -2124,7 +2124,7 @@ public final class SandboxOptions {
+         );
+         public final SandboxOptions.IntegerSandboxOption rallyGroupRadius = SandboxOptions.this.newIntegerOption("ZombieConfig.RallyGroupRadius", 1, 10, 3);
+         public final SandboxOptions.IntegerSandboxOption zombiesCountBeforeDeletion = SandboxOptions.this.newIntegerOption(
+-            "ZombieConfig.ZombiesCountBeforeDelete", 10, 500, 300
++            "ZombieConfig.ZombiesCountBeforeDelete", 10, 10000, 300
+         );
+     }
+ 
