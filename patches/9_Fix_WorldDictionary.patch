@@ -1,0 +1,15 @@
+diff --git a/source/zombie/world/ScriptsDictionary.java b/source/zombie/world/ScriptsDictionary.java
+index 7e392ff..4636610 100644
+--- a/source/zombie/world/ScriptsDictionary.java
++++ b/source/zombie/world/ScriptsDictionary.java
+@@ -287,6 +287,10 @@ public class ScriptsDictionary {
+                 ((DictionaryScriptInfo)entry.getValue()).isLoaded = false;
+             }
+ 
++            for (Entry<String, DictionaryScriptInfo<T>> entry : this.namedMap.entrySet()) {
++                entry.getValue().isLoaded = false;
++            }
++
+             for (Entry<String, DictionaryScriptInfo<T>> entry : this.loadList.entrySet()) {
+                 DictionaryScriptInfo<T> info = (DictionaryScriptInfo<T>)entry.getValue();
+                 DictionaryScriptInfo<T> stored = (DictionaryScriptInfo<T>)this.namedMap.get(info.name);
