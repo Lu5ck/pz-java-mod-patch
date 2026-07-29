@@ -27,7 +27,7 @@ jobs:
           ~/steamcmd/steamcmd.sh \
             +force_install_dir ~/pzserver/ \
             +login anonymous \
-            +app_update 380870 -beta unstable validate \
+            +app_update 380870 validate \
             +quit
 
       - name: Download ZomboidDecompiler
