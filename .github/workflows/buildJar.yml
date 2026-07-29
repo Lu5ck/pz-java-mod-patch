@@ -50,7 +50,7 @@ jobs:
             +app_info_print 380870 \
             +quit 2>/dev/null \
             | grep -A 20 '"branches"' \
-            | grep '"unstable"' -A 5 \
+            | grep '"public"' -A 5 \
             | grep '"buildid"' \
             | awk -F'"' '{print $4}' \
             | head -1)
@@ -84,7 +84,7 @@ jobs:
           ~/steamcmd/steamcmd.sh \
             +force_install_dir ~/pzserver/ \
             +login anonymous \
-            +app_update 380870 -beta unstable validate \
+            +app_update 380870 validate \
             +quit
 
       # ---------------------------------------------------------------
@@ -233,12 +233,12 @@ jobs:
       # ---------------------------------------------------------------
       - name: Create GitHub Release
         if: steps.pz_version.outputs.skip != 'true'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: "pz-build-${{ steps.pz_version.outputs.build_id }}"
           name: "PZ Build ${{ steps.pz_version.outputs.build_id }}"
           body: |
-            Automated modded build for Project Zomboid (unstable) build **${{ steps.pz_version.outputs.build_id }}**.
+            Automated modded build for Project Zomboid stable build **${{ steps.pz_version.outputs.build_id }}**.
 
             ### Applied patches
             ${{ steps.patch_list.outputs.list }}

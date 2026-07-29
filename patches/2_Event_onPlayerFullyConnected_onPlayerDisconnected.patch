@@ -12,7 +12,7 @@ index 53194fb..5a18c96 100644
  
      public static void clear() {
 diff --git a/source/zombie/core/raknet/UdpConnection.java b/source/zombie/core/raknet/UdpConnection.java
-index 3a400eb..e369015 100644
+index 73ca99f..3c1fba4 100644
 --- a/source/zombie/core/raknet/UdpConnection.java
 +++ b/source/zombie/core/raknet/UdpConnection.java
 @@ -32,6 +32,7 @@ import zombie.network.anticheats.PacketValidator;
@@ -23,23 +23,23 @@ index 3a400eb..e369015 100644
  
  public class UdpConnection extends PacketsCache implements IConnection {
      private static final long PLAYER_SAVE_INTERVAL = 180000L;
-@@ -384,6 +385,7 @@ public class UdpConnection extends PacketsCache implements IConnection {
-         this.fullyConnected = true;
-         this.playerSave.Reset();
-         this.setConnectionTimestamp(5000L);
-+        LuaEventManager.triggerEvent("onPlayerFullyConnected", this.userName, this.steamId);
+@@ -389,6 +390,7 @@ public class UdpConnection extends PacketsCache implements IConnection {
+         this.setConnectionTimestamp(15000L);
          ConnectionManager.log("fully-connected", "", this);
          EventManager.instance().report("[" + this.userName + "] connected to server");
++        LuaEventManager.triggerEvent("onPlayerFullyConnected", this.userName, this.steamId);
      }
+ 
+     @Override
 diff --git a/source/zombie/network/GameServer.java b/source/zombie/network/GameServer.java
-index b5a7ad8..d4c4b14 100644
+index fa4b1f0..f5fddc3 100644
 --- a/source/zombie/network/GameServer.java
 +++ b/source/zombie/network/GameServer.java
-@@ -2770,6 +2770,7 @@ public class GameServer {
-             INetworkPacket.sendToAll(PacketTypes.PacketType.PlayerTimeout, player);
-             ServerLOS.instance.removePlayer(player);
-             ZombiePopulationManager.instance.updateLoadedAreas();
-+            LuaEventManager.triggerEvent("onPlayerDisconnected", player.getUsername(), player.getSteamID());
-             DebugType.DetailedInfo.trace("Disconnected player \"" + player.getDisplayName() + "\" " + connection.getConnectedGUID());
+@@ -2655,6 +2655,7 @@ public class GameServer {
              LoggerManager.getLogger("user")
                  .write(connection.getIDStr() + " \"" + player.getUsername() + "\" disconnected player " + LoggerManager.getPlayerCoords(player));
+             SteamGameServer.RemovePlayer(player);
++            LuaEventManager.triggerEvent("onPlayerDisconnected", player.getUsername(), player.getSteamID());
+         }
+     }
+ 

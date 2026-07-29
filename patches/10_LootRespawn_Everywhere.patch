@@ -1,0 +1,20 @@
+diff --git a/source/zombie/LootRespawn.java b/source/zombie/LootRespawn.java
+index 39a9aa2..22d874f 100644
+--- a/source/zombie/LootRespawn.java
++++ b/source/zombie/LootRespawn.java
+@@ -109,11 +109,10 @@ public final class LootRespawn {
+             for (int x = 0; x < 8; x++) {
+                 IsoGridSquare sq = chunk.getGridSquare(x, y, 0);
+                 Zone zone = sq == null ? null : sq.getZone();
+-                if (zone != null
+-                    && ("TownZone".equals(zone.getType()) || "TownZones".equals(zone.getType()) || "TrailerPark".equals(zone.getType()))
+-                    && (!constructionPreventsRespawn || !zone.haveConstruction)
+-                    && (seenHoursPreventRespawn <= 0 || !(zone.getHoursSinceLastSeen() <= seenHoursPreventRespawn))
+-                    && (!safehousePreventsRespawn || SafeHouse.getSafeHouse(sq) == null)) {
++                boolean constructionOK = !constructionPreventsRespawn || zone == null || !zone.haveConstruction;
++                boolean seenHoursOK = seenHoursPreventRespawn <= 0 || zone == null || !(zone.getHoursSinceLastSeen() <= seenHoursPreventRespawn);
++                boolean safehouseOK = !safehousePreventsRespawn || SafeHouse.getSafeHouse(sq) == null;
++                if (constructionOK && seenHoursOK && safehouseOK) {
+                     if (sq.getBuilding() != null) {
+                         BuildingDef buildingDef = sq.getBuilding().getDef();
+                         if (buildingDef != null) {
