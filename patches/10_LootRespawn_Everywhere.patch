@@ -12,7 +12,7 @@ index 39a9aa2..22d874f 100644
 -                    && (seenHoursPreventRespawn <= 0 || !(zone.getHoursSinceLastSeen() <= seenHoursPreventRespawn))
 -                    && (!safehousePreventsRespawn || SafeHouse.getSafeHouse(sq) == null)) {
 +                boolean constructionOK = !constructionPreventsRespawn || zone == null || !zone.haveConstruction;
-+                boolean seenHoursOK = seenHoursPreventRespawn <= 0 || zone == null || !(zone.getHoursSinceLastSeen() <= seenHoursPreventRespawn);
++                boolean seenHoursOK = seenHoursPreventRespawn <= 0 || !(sq.getHoursSinceLastSeen() <= seenHoursPreventRespawn);
 +                boolean safehouseOK = !safehousePreventsRespawn || SafeHouse.getSafeHouse(sq) == null;
 +                if (constructionOK && seenHoursOK && safehouseOK) {
                      if (sq.getBuilding() != null) {
