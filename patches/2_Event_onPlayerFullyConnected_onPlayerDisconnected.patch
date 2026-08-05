@@ -12,18 +12,18 @@ index 53194fb..5a18c96 100644
  
      public static void clear() {
 diff --git a/source/zombie/core/raknet/UdpConnection.java b/source/zombie/core/raknet/UdpConnection.java
-index 73ca99f..3c1fba4 100644
+index ffdef67..4ebf076 100644
 --- a/source/zombie/core/raknet/UdpConnection.java
 +++ b/source/zombie/core/raknet/UdpConnection.java
-@@ -32,6 +32,7 @@ import zombie.network.anticheats.PacketValidator;
- import zombie.network.server.EventManager;
+@@ -33,6 +33,7 @@ import zombie.network.server.EventManager;
  import zombie.network.statistics.data.NetworkStatistic;
  import zombie.util.StringUtils;
+ import zombie.vehicles.BaseVehicle;
 +import zombie.Lua.LuaEventManager;
  
  public class UdpConnection extends PacketsCache implements IConnection {
      private static final long PLAYER_SAVE_INTERVAL = 180000L;
-@@ -389,6 +390,7 @@ public class UdpConnection extends PacketsCache implements IConnection {
+@@ -391,6 +392,7 @@ public class UdpConnection extends PacketsCache implements IConnection {
          this.setConnectionTimestamp(15000L);
          ConnectionManager.log("fully-connected", "", this);
          EventManager.instance().report("[" + this.userName + "] connected to server");
@@ -32,7 +32,7 @@ index 73ca99f..3c1fba4 100644
  
      @Override
 diff --git a/source/zombie/network/GameServer.java b/source/zombie/network/GameServer.java
-index fa4b1f0..f5fddc3 100644
+index ab1b0bc..e434358 100644
 --- a/source/zombie/network/GameServer.java
 +++ b/source/zombie/network/GameServer.java
 @@ -2655,6 +2655,7 @@ public class GameServer {
