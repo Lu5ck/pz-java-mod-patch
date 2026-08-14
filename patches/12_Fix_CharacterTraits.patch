@@ -1,0 +1,26 @@
+diff --git a/source/zombie/characters/traits/CharacterTraits.java b/source/zombie/characters/traits/CharacterTraits.java
+index 0e67e91..1cd82fd 100644
+--- a/source/zombie/characters/traits/CharacterTraits.java
++++ b/source/zombie/characters/traits/CharacterTraits.java
+@@ -93,7 +93,9 @@ public final class CharacterTraits {
+ 
+         for (int i = 0; i < numberOfKnownTraits; i++) {
+             CharacterTrait characterTrait = CharacterTrait.get(ResourceLocation.of(GameWindow.ReadString(input)));
+-            this.add(characterTrait);
++            if (characterTrait != null) {
++                this.add(characterTrait);
++            }
+         }
+     }
+ 
+@@ -121,7 +123,9 @@ public final class CharacterTraits {
+ 
+         for (int i = 0; i < numberOfKnownTraits; i++) {
+             CharacterTrait characterTrait = CharacterTrait.get(ResourceLocation.of(input.getUTF()));
+-            this.add(characterTrait);
++            if (characterTrait != null) {
++                this.add(characterTrait);
++            }
+         }
+     }
+ 
