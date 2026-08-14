@@ -1,0 +1,15 @@
+diff --git a/source/zombie/world/StringDictionary.java b/source/zombie/world/StringDictionary.java
+index a637b48..1260096 100644
+--- a/source/zombie/world/StringDictionary.java
++++ b/source/zombie/world/StringDictionary.java
+@@ -228,6 +228,10 @@ public class StringDictionary {
+                 ((DictionaryStringInfo)entry.getValue()).isLoaded = false;
+             }
+ 
++            for (Entry<String, DictionaryStringInfo> entry : this.stringToIdMap.entrySet()) {
++                ((DictionaryStringInfo)entry.getValue()).isLoaded = false;
++            }
++
+             for (Entry<String, DictionaryStringInfo> entry : this.loadList.entrySet()) {
+                 DictionaryStringInfo info = (DictionaryStringInfo)entry.getValue();
+                 DictionaryStringInfo stored = (DictionaryStringInfo)this.stringToIdMap.get(info.string);
