@@ -1,3 +1,17 @@
+diff --git a/source/zombie/characters/SurvivorDesc.java b/source/zombie/characters/SurvivorDesc.java
+index 297025a..414aa2f 100644
+--- a/source/zombie/characters/SurvivorDesc.java
++++ b/source/zombie/characters/SurvivorDesc.java
+@@ -263,6 +263,9 @@ public final class SurvivorDesc implements IHumanVisual {
+         this.torso = GameWindow.ReadString(input);
+         this.characterGender = input.getInt() == 1 ? CharacterGender.FEMALE : CharacterGender.MALE;
+         this.characterProfession = CharacterProfession.get(ResourceLocation.of(GameWindow.ReadString(input)));
++        if (this.characterProfession == null) {
++            this.characterProfession = CharacterProfession.UNEMPLOYED;
++        }
+         this.doStats();
+         if (idCount < this.id) {
+             idCount = this.id;
 diff --git a/source/zombie/characters/traits/CharacterTraits.java b/source/zombie/characters/traits/CharacterTraits.java
 index 0e67e91..1cd82fd 100644
 --- a/source/zombie/characters/traits/CharacterTraits.java
