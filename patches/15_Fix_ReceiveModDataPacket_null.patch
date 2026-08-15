@@ -1,0 +1,15 @@
+diff --git a/source/zombie/network/packets/service/ReceiveModDataPacket.java b/source/zombie/network/packets/service/ReceiveModDataPacket.java
+index 5f25fbc..1b7af74 100644
+--- a/source/zombie/network/packets/service/ReceiveModDataPacket.java
++++ b/source/zombie/network/packets/service/ReceiveModDataPacket.java
+@@ -161,6 +161,10 @@ public class ReceiveModDataPacket implements INetworkPacket {
+ 
+     @Override
+     public void processServer(PacketTypes.PacketType packetType, UdpConnection connection) {
++        if (this.sq == null) {
++            return;
++        }
++
+         LuaEventManager.triggerEvent("onLoadModDataFromServer", this.sq);
+ 
+         for (int n = 0; n < GameServer.udpEngine.connections.size(); n++) {
