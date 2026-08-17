@@ -1,0 +1,27 @@
+diff --git a/source/zombie/worldMap/WorldMapVisitedServer.java b/source/zombie/worldMap/WorldMapVisitedServer.java
+index 1af1f82..05921aa 100644
+--- a/source/zombie/worldMap/WorldMapVisitedServer.java
++++ b/source/zombie/worldMap/WorldMapVisitedServer.java
+@@ -29,6 +29,8 @@ import zombie.iso.SliceY;
+ import zombie.network.GameServer;
+ import zombie.network.IConnection;
+ import zombie.scripting.FileName;
++import zombie.SandboxOptions;
++import zombie.iso.IsoMetaGrid;
+ 
+ @UsedFromLua
+ public class WorldMapVisitedServer {
+@@ -184,6 +186,13 @@ public class WorldMapVisitedServer {
+                 }
+             }
+ 
++            if (SandboxOptions.getInstance().map.mapAllKnown.getValue()) {
++                IsoMetaGrid metaGrid = IsoWorld.instance.getMetaGrid();
++                if (metaGrid != null) {
++                    WorldMapVisited.setKnownInSquares(metaGrid.minX * 256, metaGrid.minY * 256, (metaGrid.maxX + 1) * 256, (metaGrid.maxY + 1) * 256, entity);
++                }
++            }
++
+             this.dictionary.put(connection.getUserName(), entity);
+         }
+     }
