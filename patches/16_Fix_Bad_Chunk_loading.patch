@@ -1,0 +1,139 @@
+diff --git a/source/zombie/iso/areas/isoregion/data/DataChunk.java b/source/zombie/iso/areas/isoregion/data/DataChunk.java
+index 52918fe..05e5b15 100644
+--- a/source/zombie/iso/areas/isoregion/data/DataChunk.java
++++ b/source/zombie/iso/areas/isoregion/data/DataChunk.java
+@@ -195,7 +195,7 @@ public final class DataChunk {
+             int startPos = bb.position();
+             bb.putInt(0);
+             bb.putInt(this.highestZ);
+-            int maxBytes = (this.highestZ + 1) * 8 * 8;
++            int maxBytes = this.squareFlags != null ? (this.highestZ + 1) * 8 * 8 : 0;
+             bb.putInt(maxBytes);
+ 
+             for (int i = 0; i < maxBytes; i++) {
+@@ -211,7 +211,7 @@ public final class DataChunk {
+         }
+     }
+ 
+-    public void load(ByteBuffer bb, int worldVersion, boolean readLength) {
++    public boolean load(ByteBuffer bb, int worldVersion, boolean readLength) {
+         try {
+             if (readLength) {
+                 bb.getInt();
+@@ -228,8 +228,31 @@ public final class DataChunk {
+             for (int i = 0; i < maxBytes; i++) {
+                 this.squareFlags[i] = bb.get();
+             }
++
++            return true;
+         } catch (Exception e) {
+-            DebugType.General.printException(e, LogSeverity.Error);
++            DebugType.General.printException(
++                e,
++                LogSeverity.Error,
++                "DataChunk.load failed for chunk (%d, %d) [hashId=%d] - resetting this chunk's region data",
++                this.chunkX,
++                this.chunkY,
++                this.hashId
++            );
++            this.resetCorruptState();
++            return false;
++        }
++    }
++
++    private void resetCorruptState() {
++        this.highestZ = 0;
++        Arrays.fill(this.activeZLayers, false);
++        Arrays.fill(this.dirtyZLayers, false);
++        this.squareFlags = null;
++        this.regionIds = null;
++
++        for (ArrayList<IsoChunkRegion> zRegions : this.chunkRegions) {
++            zRegions.clear();
+         }
+     }
+ 
+@@ -317,7 +340,7 @@ public final class DataChunk {
+     }
+ 
+     private IsoChunkRegion getIsoChunkRegion(int coord1D, int z) {
+-        if (z >= 0 && z < this.highestZ + 1) {
++        if (z >= 0 && z < this.highestZ + 1 && this.regionIds != null && coord1D >= 0 && coord1D < this.regionIds.length) {
+             byte id = this.regionIds[coord1D];
+             if (id >= 0 && id < ((ArrayList)this.chunkRegions.get(z)).size()) {
+                 return (IsoChunkRegion)((ArrayList)this.chunkRegions.get(z)).get(id);
+diff --git a/source/zombie/iso/areas/isoregion/jobs/JobChunkUpdate.java b/source/zombie/iso/areas/isoregion/jobs/JobChunkUpdate.java
+index 5fa878b..8ac70dd 100644
+--- a/source/zombie/iso/areas/isoregion/jobs/JobChunkUpdate.java
++++ b/source/zombie/iso/areas/isoregion/jobs/JobChunkUpdate.java
+@@ -12,17 +12,21 @@ import zombie.core.raknet.UdpConnection;
+ import zombie.debug.DebugType;
+ import zombie.debug.LogSeverity;
+ import zombie.iso.IsoChunk;
++import zombie.iso.IsoWorld;
+ import zombie.iso.areas.isoregion.ChunkUpdate;
+ import zombie.iso.areas.isoregion.IsoRegions;
+ import zombie.iso.areas.isoregion.data.DataChunk;
+ import zombie.iso.areas.isoregion.data.DataRoot;
+ import zombie.network.GameClient;
++import zombie.network.GameServer;
++import zombie.network.ServerMap;
+ 
+ /**
+  * TurboTuTone.
+  */
+ public class JobChunkUpdate extends RegionJob {
+     private final ByteBuffer buffer = ByteBuffer.allocate(65536);
++    private final ByteBuffer rebuildBuffer = ByteBuffer.allocate(2076);
+     private int chunkCount;
+     private int bufferMaxBytes;
+     private long netTimeStamp = -1L;
+@@ -71,6 +75,7 @@ public class JobChunkUpdate extends RegionJob {
+         int count = this.buffer.getInt();
+ 
+         for (int i = 0; i < count; i++) {
++            int recordStart = this.buffer.position();
+             int packlen = this.buffer.getInt();
+             int worldVers = this.buffer.getInt();
+             int chunkx = this.buffer.getInt();
+@@ -92,13 +97,38 @@ public class JobChunkUpdate extends RegionJob {
+                 }
+             }
+ 
+-            root.select.chunk.load(this.buffer, worldVers, true);
+-            root.select.chunk.setDirtyAllActive();
++            boolean loadOk = false;
++
++            try {
++                loadOk = root.select.chunk.load(this.buffer, worldVers, true);
++                root.select.chunk.setDirtyAllActive();
++            } finally {
++                this.buffer.position(recordStart + packlen);
++            }
++
++            if (!loadOk) {
++                this.rebuildFromLiveTiles(root.select.chunk, chunkx, chunky, worldVers);
++            }
+         }
+ 
+         return true;
+     }
+ 
++    private void rebuildFromLiveTiles(DataChunk chunk, int chunkx, int chunky, int worldVers) {
++        IsoChunk liveChunk = GameServer.server ? ServerMap.instance.getChunk(chunkx, chunky) : IsoWorld.instance.getCell().getChunk(chunkx, chunky);
++        if (liveChunk == null) {
++            return;
++        }
++
++        this.rebuildBuffer.clear();
++        ChunkUpdate.writeIsoChunkIntoBuffer(liveChunk, this.rebuildBuffer);
++        this.rebuildBuffer.flip();
++        if (chunk.load(this.rebuildBuffer, worldVers, true)) {
++            chunk.setDirtyAllActive();
++            DebugType.General.warn("DataChunk (%d, %d) rebuilt from live tile data after a corrupt load.", chunkx, chunky);
++        }
++    }
++
+     public boolean saveChunksToDisk() {
+         if (Core.getInstance().isNoSave()) {
+             return true;
