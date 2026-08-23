@@ -1,0 +1,125 @@
+diff --git a/source/zombie/iso/areas/isoregion/data/DataChunk.java b/source/zombie/iso/areas/isoregion/data/DataChunk.java
+index 52918fe..e6c384c 100644
+--- a/source/zombie/iso/areas/isoregion/data/DataChunk.java
++++ b/source/zombie/iso/areas/isoregion/data/DataChunk.java
+@@ -217,19 +217,62 @@ public final class DataChunk {
+                 bb.getInt();
+             }
+ 
+-            this.highestZ = bb.getInt();
++            int highestZRead = bb.getInt();
++            int maxBytes = bb.getInt();
++
++            boolean valid = highestZRead >= 0 && highestZRead < 32 && maxBytes == (highestZRead + 1) * 8 * 8;
++
++            if (!valid) {
++                IsoRegions.warn(
++                    "DataChunk.load: corrupt record for chunk " + this.chunkX + "," + this.chunkY
++                        + " (highestZ=" + highestZRead + ", maxBytes=" + maxBytes
++                        + "); resetting chunk instead of loading."
++                );
++                this.resetData();
++                return;
++            }
++
++            this.highestZ = highestZRead;
+ 
+             for (int z = this.highestZ; z >= 0; z--) {
+                 this.ensureSquares(z);
+             }
+ 
+-            int maxBytes = bb.getInt();
+-
+             for (int i = 0; i < maxBytes; i++) {
+                 this.squareFlags[i] = bb.get();
+             }
+         } catch (Exception e) {
+             DebugType.General.printException(e, LogSeverity.Error);
++            this.resetData();
++        }
++    }
++
++    private void resetData() {
++        for (int z = 0; z <= this.highestZ; z++) {
++            this.releaseZLayerRegions(z);
++        }
++
++        this.highestZ = 0;
++        Arrays.fill(this.activeZLayers, false);
++        Arrays.fill(this.dirtyZLayers, false);
++        this.squareFlags = null;
++        this.regionIds = null;
++        this.ensureSquares(0);
++        this.setDirtyAllActive();
++    }
++
++    private void releaseZLayerRegions(int z) {
++        ArrayList<IsoChunkRegion> zRegions = (ArrayList<IsoChunkRegion>)this.chunkRegions.get(z);
++
++        for (int i = zRegions.size() - 1; i >= 0; i--) {
++            IsoChunkRegion isoChunkRegion = (IsoChunkRegion)zRegions.get(i);
++            IsoWorldRegion mr = isoChunkRegion.unlinkFromIsoWorldRegion();
++            if (mr != null && mr.size() <= 0) {
++                this.cell.dataRoot.regionManager.releaseIsoWorldRegion(mr);
++            }
++
++            this.cell.dataRoot.regionManager.releaseIsoChunkRegion(isoChunkRegion);
++            zRegions.remove(i);
+         }
+     }
+ 
+@@ -348,7 +391,10 @@ public final class DataChunk {
+     }
+ 
+     void clearBuildingDefs(IsoWorldRegion isoWorldRegion, ArrayList<IsoGameCharacter.Location> changedCells, HashSet<IsoWorldRegion> done) {
+-        if (!done.contains(isoWorldRegion)) {
++        // A chunk region can transiently have no IsoWorldRegion assigned yet (e.g. before the
++        // first interConnect() pass, or right after a reset) - this is already treated as a
++        // normal, expected state elsewhere in this class (see interConnect(), recalcRoofs()).
++        if (isoWorldRegion != null && !done.contains(isoWorldRegion)) {
+             done.add(isoWorldRegion);
+             isoWorldRegion.clearBuildingDef(changedCells);
+ 
+diff --git a/source/zombie/iso/areas/isoregion/jobs/JobChunkUpdate.java b/source/zombie/iso/areas/isoregion/jobs/JobChunkUpdate.java
+index 5fa878b..5d08f59 100644
+--- a/source/zombie/iso/areas/isoregion/jobs/JobChunkUpdate.java
++++ b/source/zombie/iso/areas/isoregion/jobs/JobChunkUpdate.java
+@@ -71,16 +71,26 @@ public class JobChunkUpdate extends RegionJob {
+         int count = this.buffer.getInt();
+ 
+         for (int i = 0; i < count; i++) {
++            int recordStart = this.buffer.position();
+             int packlen = this.buffer.getInt();
+             int worldVers = this.buffer.getInt();
+             int chunkx = this.buffer.getInt();
+             int chunky = this.buffer.getInt();
++            int recordEnd = recordStart + packlen;
++
++            if (packlen < 16 || recordEnd < recordStart || recordEnd > this.buffer.limit()) {
++                IsoRegions.warn(
++                    "JobChunkUpdate.readChunksPacket: corrupt record " + i + "/" + count
++                        + " (packlen=" + packlen + ", chunk=" + chunkx + "," + chunky
++                        + "); aborting rest of packet."
++                );
++                return false;
++            }
++
+             root.select.reset(chunkx * 8, chunky * 8, 0, true, false);
+             if (GameClient.client) {
+                 if (this.netTimeStamp != -1L && this.netTimeStamp < root.select.chunk.getLastUpdateStamp()) {
+-                    int startPos = this.buffer.position();
+-                    int chunklen = this.buffer.getInt();
+-                    this.buffer.position(startPos + chunklen);
++                    this.buffer.position(recordEnd);
+                     continue;
+                 }
+ 
+@@ -94,6 +104,8 @@ public class JobChunkUpdate extends RegionJob {
+ 
+             root.select.chunk.load(this.buffer, worldVers, true);
+             root.select.chunk.setDirtyAllActive();
++
++            this.buffer.position(recordEnd);
+         }
+ 
+         return true;
