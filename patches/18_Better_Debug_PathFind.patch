@@ -1,0 +1,25 @@
+diff --git a/source/zombie/pathfind/Chunk.java b/source/zombie/pathfind/Chunk.java
+index ee77a1e..ac77e3d 100644
+--- a/source/zombie/pathfind/Chunk.java
++++ b/source/zombie/pathfind/Chunk.java
+@@ -139,6 +139,20 @@ public final class Chunk {
+             for (int i = 0; i < taskLevel.slopedSurfaces.size(); i++) {
+                 SlopedSurface slopedSurface = (SlopedSurface)taskLevel.slopedSurfaces.get(i);
+                 Square square = chunkLevel.squares[slopedSurface.x][slopedSurface.y];
++                if (square == null) {
++                    int worldX = this.wx * 8 + slopedSurface.x;
++                    int worldY = this.wy * 8 + slopedSurface.y;
++                    System.err.println(
++                        "[SlopedSurfaceDebug] NULL square for sloped surface at "
++                        + "worldX=" + worldX + " worldY=" + worldY + " z=" + z
++                        + " (chunk wx=" + this.wx + " wy=" + this.wy
++                        + " local x=" + slopedSurface.x + " local y=" + slopedSurface.y
++                        + ") direction=" + slopedSurface.direction
++                        + " heightMin=" + slopedSurface.heightMin
++                        + " heightMax=" + slopedSurface.heightMax
++                    );
++                    continue;
++                }
+                 square.slopedSurfaceDirection = slopedSurface.direction;
+                 square.slopedSurfaceHeightMin = slopedSurface.heightMin;
+                 square.slopedSurfaceHeightMax = slopedSurface.heightMax;
