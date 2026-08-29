@@ -1,0 +1,51 @@
+diff --git a/source/zombie/iso/IsoChunk.java b/source/zombie/iso/IsoChunk.java
+index b80554e..795d557 100644
+--- a/source/zombie/iso/IsoChunk.java
++++ b/source/zombie/iso/IsoChunk.java
+@@ -993,6 +993,7 @@ public final class IsoChunk {
+                         case 2 -> (int)Math.ceil(chance / 10.0F);
+                         case 3 -> (int)Math.ceil(chance / 1.5F);
+                         case 5 -> 2;
++                        default -> chance;
+                     };
+                     if (SystemDisabler.doVehiclesEverywhere || DebugOptions.instance.vehicleSpawnEverywhere.getValue() || type.forceSpawn) {
+                         chance = 100;
+@@ -3091,6 +3092,11 @@ public final class IsoChunk {
+ 
+     public void setSquare(int x, int y, int z, IsoGridSquare square) {
+         assert square == null || square.x - this.wx * 8 == x && square.y - this.wy * 8 == y && square.z == z;
++        if (z < -32 || z > 31) {
++            DebugType.General.println("Chunk " + this.wx + "," + this.wy
++                + " attempted setSquare at invalid z=" + z + ", ignoring.");
++            return;
++        }
+         boolean bNewLevels = !this.isValidLevel(z);
+         this.setMinMaxLevel(PZMath.min(this.getMinLevel(), z), PZMath.max(this.getMaxLevel(), z));
+         int zz = this.squaresIndexOfLevel(z);
+@@ -3544,6 +3550,17 @@ public final class IsoChunk {
+                 minLevel = 0;
+             }
+ 
++            if (maxLevel > 31 || minLevel < -32 || minLevel > maxLevel) {
++                DebugType.General.println("Chunk " + this.wx + "," + this.wy
++                    + " loaded invalid level range minLevel=" + minLevel + " maxLevel=" + maxLevel
++                    + ", clamping to valid range.");
++                maxLevel = PZMath.min(maxLevel, 31);
++                minLevel = PZMath.max(minLevel, -32);
++                if (minLevel > maxLevel) {
++                    minLevel = maxLevel;
++                }
++            }
++
+             this.setMinMaxLevel(minLevel, maxLevel);
+             int c = sliceBufferLoad.getInt();
+ 
+@@ -4453,7 +4470,7 @@ public final class IsoChunk {
+                 bb.putLong(0L);
+                 long flags = 0L;
+ 
+-                for (int z = this.minLevel; z <= this.maxLevel; z++) {
++                for (int z = PZMath.max(this.minLevel, -32); z <= PZMath.min(this.maxLevel, 31); z++) {
+                     IsoGridSquare gs = this.getGridSquare(x, y, z);
+                     bb = ensureCapacity(bb);
+                     if (gs != null && gs.shouldSave()) {
