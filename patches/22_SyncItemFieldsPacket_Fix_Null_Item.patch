@@ -1,0 +1,15 @@
+diff --git a/source/zombie/network/packets/SyncItemFieldsPacket.java b/source/zombie/network/packets/SyncItemFieldsPacket.java
+index 8f3cd39..ea1f10a 100644
+--- a/source/zombie/network/packets/SyncItemFieldsPacket.java
++++ b/source/zombie/network/packets/SyncItemFieldsPacket.java
+@@ -346,6 +346,10 @@ public class SyncItemFieldsPacket implements INetworkPacket {
+         this.hasFluidContainer = b.getBoolean();
+         if (this.containerId.getContainer() != null) {
+             InventoryItem item = this.containerId.getContainer().getItemWithID(this.itemId);
++            if (item == null) {
++                DebugType.General.warn("SyncItemFieldsPacket.parse: item id=" + this.itemId + " not found in container (stale/removed item), skipping remaining fields.");
++                return;
++            }
+             if (this.hasFluidContainer) {
+                 this.fluidContainer = item.getComponent(ComponentType.FluidContainer);
+                 if (this.fluidContainer != null) {
