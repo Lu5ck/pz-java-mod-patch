@@ -1,0 +1,38 @@
+diff --git a/source/zombie/network/fields/ContainerID.java b/source/zombie/network/fields/ContainerID.java
+index 943ec57..1396fd9 100644
+--- a/source/zombie/network/fields/ContainerID.java
++++ b/source/zombie/network/fields/ContainerID.java
+@@ -370,10 +370,30 @@ public class ContainerID implements INetworkPacketField {
+ 
+     public void findObject() {
+         if (this.containerType == ContainerID.ContainerType.PlayerInventory) {
+-            this.container = this.playerId.getPlayer().getInventory();
++            IsoPlayer player = this.playerId.getPlayer();
++            if (player == null) {
++                DebugLog.log("ERROR: ContainerID.findObject: PlayerInventory referenced player is null (id=" + this.playerId.getID() + ")");
++                this.container = null;
++                return;
++            }
++
++            this.container = player.getInventory();
+         } else if (this.containerType == ContainerID.ContainerType.InventoryContainer) {
+-            ItemContainer playerContainer = this.playerId.getPlayer().getInventory();
+-            InventoryContainer containingItem = (InventoryContainer)playerContainer.getItemWithIDRecursiv(this.worldItemId);
++            IsoPlayer player = this.playerId.getPlayer();
++            if (player == null) {
++                DebugLog.log("ERROR: ContainerID.findObject: InventoryContainer referenced player is null (id=" + this.playerId.getID() + ")");
++                this.container = null;
++                return;
++            }
++
++            ItemContainer playerContainer = player.getInventory();
++            InventoryContainer containingItem = playerContainer == null ? null : (InventoryContainer)playerContainer.getItemWithIDRecursiv(this.worldItemId);
++            if (containingItem == null) {
++                DebugLog.log("ERROR: ContainerID.findObject: InventoryContainer worldItemId " + this.worldItemId + " not found for player " + player.username);
++                this.container = null;
++                return;
++            }
++
+             this.container = containingItem.getItemContainer();
+         } else if (IsoWorld.instance.currentCell != null) {
+             IsoGridSquare sq = IsoWorld.instance.currentCell.getGridSquare(this.x, this.y, this.z);
