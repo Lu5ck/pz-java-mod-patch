@@ -1,0 +1,27 @@
+diff --git a/source/zombie/network/packets/connection/LoginPacket.java b/source/zombie/network/packets/connection/LoginPacket.java
+index ff93c28..1911130 100644
+--- a/source/zombie/network/packets/connection/LoginPacket.java
++++ b/source/zombie/network/packets/connection/LoginPacket.java
+@@ -66,6 +66,22 @@ public class LoginPacket implements INetworkPacket {
+                 if (connection.getSteamId() != connection.getOwnerId()) {
+                     connection.setIDStr(connection.getIDStr() + "(owner=" + SteamUtils.convertSteamIDToString(connection.getOwnerId()) + ")");
+                 }
++
++                if (connection.getSteamId() <= 0L) {
++                    LoggerManager.getLogger("user")
++                        .write(
++                            "access denied: user \""
++                                + this.username
++                                + "\" invalid/unresolved steam id ("
++                                + connection.getSteamId()
++                                + ") ip="
++                                + connection.getIP()
++                        );
++                    AntiCheat.log(connection, "steamid: user \"" + this.username + "\" connected with an invalid/unresolved steam id");
++                    INetworkPacket.send(connection, PacketTypes.PacketType.AccessDenied, "InvalidSteamID");
++                    connection.forceDisconnect("access-denied-invalid-steamid");
++                    return;
++                }
+             }
+ 
+             connection.password = this.password;
