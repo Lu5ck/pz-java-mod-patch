@@ -1,5 +1,5 @@
 diff --git a/source/zombie/core/logger/ZLogger.java b/source/zombie/core/logger/ZLogger.java
-index a75b99e..a1675f1 100644
+index f2363d6..9e8dbcc 100644
 --- a/source/zombie/core/logger/ZLogger.java
 +++ b/source/zombie/core/logger/ZLogger.java
 @@ -16,6 +16,7 @@ public final class ZLogger {
@@ -10,16 +10,17 @@ index a75b99e..a1675f1 100644
      private static final SimpleDateFormat s_logSdf = new SimpleDateFormat("dd-MM-yy HH:mm:ss.SSS");
      private static final long s_maxSizeKo = 10000L;
  
-@@ -101,9 +102,10 @@ public final class ZLogger {
+@@ -105,8 +106,11 @@ public final class ZLogger {
  
      private synchronized void checkSizeUnsafe() throws Exception {
          long currentKo = this.file.length() / 1024L;
 -        if (currentKo > 10000L) {
+-            this.recreateLogFileUnsafe();
 +        if (currentKo > s_maxSizeKo) {
-             this.outputStreams.file.close();
--            this.file = new File(LoggerManager.getLogsDir() + File.separator + getLoggerName(this.name) + ".txt");
++            this.outputStreams.file.close();
 +            this.rotationIndex++;
-+            this.file = new File(LoggerManager.getLogsDir() + File.separator + getLoggerName(this.name) + "_" + this.rotationIndex + ".txt");
-             this.outputStreams.file = new PrintStream(this.file);
++            this.file = new File(LoggerManager.getLogFilePath(this.name + "_" + this.rotationIndex));
++            this.outputStreams.file = new PrintStream(this.file);
          }
      }
+ 
