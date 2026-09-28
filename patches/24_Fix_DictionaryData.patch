@@ -1,0 +1,41 @@
+diff --git a/source/zombie/world/DictionaryData.java b/source/zombie/world/DictionaryData.java
+index 8e3eb6a..300439d 100644
+--- a/source/zombie/world/DictionaryData.java
++++ b/source/zombie/world/DictionaryData.java
+@@ -264,8 +264,8 @@ public class DictionaryData {
+                         this.itemTypeToInfoMap.put(info.fullType, itemInfo);
+                         this.itemIdToInfoMap.put(info.registryId, itemInfo);
+                     } else {
+-                        this.entityTypeToInfoMap.put(info.fullType, info);
+-                        this.entityIdToInfoMap.put(info.registryId, info);
++                        this.entityTypeToInfoMap.put(info.fullType, (EntityInfo)info);
++                        this.entityIdToInfoMap.put(info.registryId, (EntityInfo)info);
+                     }
+ 
+                     WorldDictionaryLogger.log(new Log.RegisterItem(info.copy()));
+@@ -312,8 +312,11 @@ public class DictionaryData {
+             boolean registered = false;
+             if (info instanceof ItemInfo itemInfo) {
+                 if (itemInfo.scriptItem == null) {
+-                    itemInfo.scriptItem = ScriptManager.instance.getSpecificItem(info.fullType);
+-                    itemInfo.entityScript = itemInfo.scriptItem;
++                    var found = ScriptManager.instance.getSpecificItem(info.fullType);
++                    if (found != null && info.fullType.equals(found.getFullName())) {
++                        itemInfo.scriptItem = found;
++                        itemInfo.entityScript = found;
++                    }
+                 }
+ 
+                 if (itemInfo.scriptItem != null) {
+@@ -323,7 +326,10 @@ public class DictionaryData {
+             } else {
+                 EntityInfo entityInfo = (EntityInfo)info;
+                 if (entityInfo.entityScript == null) {
+-                    entityInfo.entityScript = ScriptManager.instance.getSpecificEntity(info.fullType);
++                    var found = ScriptManager.instance.getSpecificEntity(info.fullType);
++                    if (found != null && info.fullType.equals(found.getFullName())) {
++                        entityInfo.entityScript = found;
++                    }
+                 }
+ 
+                 if (entityInfo.entityScript != null) {
