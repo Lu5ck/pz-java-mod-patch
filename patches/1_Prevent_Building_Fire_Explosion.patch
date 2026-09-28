@@ -1,8 +1,8 @@
 diff --git a/source/zombie/iso/IsoGridSquare.java b/source/zombie/iso/IsoGridSquare.java
-index 7505aa4..3f89d05 100644
+index ff92b66..b626f39 100644
 --- a/source/zombie/iso/IsoGridSquare.java
 +++ b/source/zombie/iso/IsoGridSquare.java
-@@ -6749,6 +6749,10 @@ public final class IsoGridSquare {
+@@ -6305,6 +6305,10 @@ public final class IsoGridSquare {
                  if (!ServerOptions.instance.safehouseAllowFire.getValue()) {
                      return;
                  }
@@ -14,7 +14,7 @@ index 7505aa4..3f89d05 100644
  
              for (int i = 0; i < this.specialObjects.size(); i++) {
 diff --git a/source/zombie/iso/objects/IsoFire.java b/source/zombie/iso/objects/IsoFire.java
-index 5cecfb2..16b146b 100644
+index 54dea65..0a00a0b 100644
 --- a/source/zombie/iso/objects/IsoFire.java
 +++ b/source/zombie/iso/objects/IsoFire.java
 @@ -279,8 +279,8 @@ public class IsoFire extends IsoObject {
