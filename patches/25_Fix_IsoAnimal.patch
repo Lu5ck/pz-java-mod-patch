@@ -1,0 +1,118 @@
+diff --git a/source/zombie/characters/animals/IsoAnimal.java b/source/zombie/characters/animals/IsoAnimal.java
+index 29ac6b7..98589ed 100644
+--- a/source/zombie/characters/animals/IsoAnimal.java
++++ b/source/zombie/characters/animals/IsoAnimal.java
+@@ -682,7 +682,6 @@ public class IsoAnimal extends IsoPlayer implements IAnimalVisual {
+         }
+     }
+ 
+-    @Override
+     public void updateStress() {
+         if (!this.isWild()) {
+             boolean incStress = true;
+@@ -859,7 +858,6 @@ public class IsoAnimal extends IsoPlayer implements IAnimalVisual {
+         }
+     }
+ 
+-    @Override
+     public void initializeStates() {
+         this.clearAIStateMap();
+         this.registerAIState("idle", AnimalIdleState.instance());
+@@ -1666,12 +1664,21 @@ public class IsoAnimal extends IsoPlayer implements IAnimalVisual {
+ 
+     public void unloaded() {
+         this.timeSinceLastUpdate = GameTime.getInstance().getCalender().getTimeInMillis();
+-        if (this.getData().getAttachedTree() != null) {
+-            this.attachBackToTreeX = this.getData().getAttachedTreeX();
+-            this.attachBackToTreeY = this.getData().getAttachedTreeY();
++        if (this.getData() == null) {
++            DebugType.Animal.println(
++                "IsoAnimal.unloaded: no AnimalData for type \"" + this.getAnimalType()
++                    + "\" at " + this.getX() + "," + this.getY() + "," + this.getZ()
++                    + " - a mod that defines this animal type is probably missing or was changed."
++            );
++        } else {
++            if (this.getData().getAttachedTree() != null) {
++                this.attachBackToTreeX = this.getData().getAttachedTreeX();
++                this.attachBackToTreeY = this.getData().getAttachedTreeY();
++            }
++
++            this.getData().setAttachedTree(null);
+         }
+ 
+-        this.getData().setAttachedTree(null);
+         this.getAnimalSoundState("voice").setDesiredSoundName(null);
+         this.getAnimalSoundState("voice").setDesiredSoundPriority(0);
+         this.getAnimalSoundState("voice").stop();
+@@ -3419,7 +3426,10 @@ public class IsoAnimal extends IsoPlayer implements IAnimalVisual {
+ 
+     public void delete() {
+         DebugType.Animal.debugln("Animal delete id=%d", this.getOnlineID());
+-        this.removeFromWorld();
++        if (this.type != null) {
++            this.removeFromWorld();
++        }
++
+         this.removeFromSquare();
+         this.setSquare(null);
+         this.removeFromUpdateLists();
+diff --git a/source/zombie/characters/animals/datas/AnimalData.java b/source/zombie/characters/animals/datas/AnimalData.java
+index a7f3bac..d44b871 100644
+--- a/source/zombie/characters/animals/datas/AnimalData.java
++++ b/source/zombie/characters/animals/datas/AnimalData.java
+@@ -1391,8 +1391,27 @@ public class AnimalData {
+         }
+ 
+         AnimalDefinitions animalDef = AnimalDefinitions.getDef(newtype);
++        if (animalDef == null) {
++            DebugType.Animal.println(
++                "AnimalData.grow: no AnimalDefinitions for next-stage type \"" + newtype + "\" at "
++                    + this.parent.getXi() + "," + this.parent.getYi() + "," + this.parent.getZi()
++                    + " - a mod that defines this animal type is probably missing or was changed. Aborting growth."
++            );
++            return;
++        }
++
+         AnimalBreed newBreed = animalDef.getBreedByName(this.breed.getName());
+         IsoAnimal newAnimal = new IsoAnimal(this.parent.getCell(), this.parent.getXi(), this.parent.getYi(), this.parent.getZi(), newtype, newBreed);
++        if (newAnimal.getData() == null) {
++            DebugType.Animal.println(
++                "AnimalData.grow: new animal of type \"" + newtype + "\" did not finish construction "
++                    + "(duplicate AnimalID or a water square) at " + this.parent.getXi() + "," + this.parent.getYi()
++                    + "," + this.parent.getZi() + " - aborting this growth attempt."
++            );
++            newAnimal.delete();
++            return;
++        }
++
+         newAnimal.getData().setAge(this.getAge());
+         newAnimal.setHoursSurvived(this.getAge() * 24);
+         newAnimal.getData().currentStageNbr = this.currentStageNbr + 1;
+diff --git a/source/zombie/core/skinnedmodel/visual/AnimalVisual.java b/source/zombie/core/skinnedmodel/visual/AnimalVisual.java
+index a973734..74e548c 100644
+--- a/source/zombie/core/skinnedmodel/visual/AnimalVisual.java
++++ b/source/zombie/core/skinnedmodel/visual/AnimalVisual.java
+@@ -15,6 +15,7 @@ import zombie.scripting.ScriptManager;
+ import zombie.scripting.objects.ModelScript;
+ import zombie.util.StringUtils;
+ import zombie.util.Type;
++import zombie.debug.DebugType;
+ 
+ @UsedFromLua
+ public class AnimalVisual extends BaseVisual {
+@@ -84,6 +85,15 @@ public class AnimalVisual extends BaseVisual {
+     }
+ 
+     public Model getModelTest(IsoAnimal animal) {
++        if (animal.adef == null) {
++            DebugType.Animal.println(
++                "AnimalVisual.getModelTest: no AnimalDefinitions for type \"" + animal.getAnimalType()
++                    + "\" at " + animal.getX() + "," + animal.getY() + "," + animal.getZ()
++                    + " - a mod that defines this animal type is probably missing or was changed."
++            );
++            return null;
++        }
++
+         if (animal.shouldBeSkeleton()) {
+             if (animal.adef.bodyModelSkelNoHead != null && animal.getModData() != null && ((KahluaTableImpl)animal.getModData()).rawgetBool("headless")) {
+                 this.skinTextureName = AnimalDefinitions.getDef(this.owner.getAnimalType()).textureSkeleton;
