@@ -1,18 +1,18 @@
 diff --git a/source/zombie/Lua/LuaEventManager.java b/source/zombie/Lua/LuaEventManager.java
-index 773d0be..146cd47 100644
+index e8ae3ca..63ae430 100644
 --- a/source/zombie/Lua/LuaEventManager.java
 +++ b/source/zombie/Lua/LuaEventManager.java
-@@ -837,6 +837,8 @@ public final class LuaEventManager implements JavaFunction {
-         AddEvent("OnSteamRefreshInternetServers");
+@@ -838,6 +838,8 @@ public final class LuaEventManager implements JavaFunction {
          AddEvent("OptionControllerButtonStyleChanged");
          AddEvent("OptionGamepadBindingPresetChanged");
+         AddEvent("OnElectricityChanged");
 +        AddEvent("onPlayerFullyConnected");
 +        AddEvent("onPlayerDisconnected");
      }
  
      public static void clear() {
 diff --git a/source/zombie/core/raknet/UdpConnection.java b/source/zombie/core/raknet/UdpConnection.java
-index 38ca6a2..255ba03 100644
+index befd15d..5475e30 100644
 --- a/source/zombie/core/raknet/UdpConnection.java
 +++ b/source/zombie/core/raknet/UdpConnection.java
 @@ -33,6 +33,7 @@ import zombie.network.server.EventManager;
@@ -32,10 +32,10 @@ index 38ca6a2..255ba03 100644
  
      @Override
 diff --git a/source/zombie/network/GameServer.java b/source/zombie/network/GameServer.java
-index 9d33155..ea1154e 100644
+index f442b7c..5fee6d6 100644
 --- a/source/zombie/network/GameServer.java
 +++ b/source/zombie/network/GameServer.java
-@@ -2686,6 +2686,7 @@ public class GameServer {
+@@ -2714,6 +2714,7 @@ public class GameServer {
              LoggerManager.getLogger("user")
                  .write(connection.getIDStr() + " \"" + player.getUsername() + "\" disconnected player " + LoggerManager.getPlayerCoords(player));
              SteamGameServer.RemovePlayer(player);
